@@ -1,20 +1,29 @@
 <template lang="pug">
-  div
-    div(ref="el" style="position: relative; height: 100%; width: 100%; top: 0; left: 0;")
-    .container-fluid
-        .columns
-            .column.mt-5.ml-5
-                | Continuum
-        .columns
-            div.columns
-        .columns.ml-5
-            div.column.continuum-container
-                div(ref="continuum").continuum
+div
+  div(
+    ref="screen",
+    style="position: fixed; top: 0px; left: 0px; height: 100%; width: 100%;"
+  )
+  div(
+    ref="el",
+    style="position: relative; height: 100%; width: 100%; top: 0; left: 0;"
+  )
+  .container-fluid
+    .columns
+      .column.mt-5.ml-5
+        | Continuum
+    .columns
+      .columns
+    .columns.ml-5
+      .column.continuum-container
+        .continuum(ref="continuum")
 </template>
 
 <script>
 // import Matter from "../../matter-js/build/matter.js";
 import Matter from "matter-js";
+
+import geckos from "@geckos.io/client";
 
 var Example = Example || {};
 
@@ -23,7 +32,7 @@ const CreateWorld = (engine, {} = {}) => {
   return engine.world;
 };
 
-Example.ballPool = async function({ element, width, height }) {
+Example.ballPool = async function ({ element, width, height }) {
   var Engine = Matter.Engine,
     Render = Matter.Render,
     Runner = Matter.Runner,
@@ -51,8 +60,8 @@ Example.ballPool = async function({ element, width, height }) {
       showVelocity: false,
       showCollisions: false,
       showBounds: false,
-      showBroadphase: false
-    }
+      showBroadphase: false,
+    },
   });
   //   render.textures["warbird"] =
 
@@ -70,16 +79,17 @@ Example.ballPool = async function({ element, width, height }) {
     frictionStatic: 0,
     frictionAir: 0,
     restitution: 1,
+    slop: 0,
     collisionFilter: {
       mask: 1,
-      category: 2
+      category: 2,
     },
     render: {
       strokeStyle: "#ffffff",
       sprite: {
-        texture: "/warbird.png"
-      }
-    }
+        texture: "/warbird.png",
+      },
+    },
   });
   let arenaLeft = Bodies.rectangle(100, height / 2, 30, height - 200, {
     friction: 0,
@@ -87,12 +97,13 @@ Example.ballPool = async function({ element, width, height }) {
     frictionAir: 0,
     isStatic: true,
     restitution: 1,
+    slop: 0,
     collisionFilter: {
-      category: 1
+      category: 1,
     },
     render: {
-      strokeStyle: "#ffffff"
-    }
+      strokeStyle: "#ffffff",
+    },
   });
 
   Matter.Resolver._restingThresh = 0.001;
@@ -102,25 +113,32 @@ Example.ballPool = async function({ element, width, height }) {
     frictionAir: 0,
     isStatic: true,
     restitution: 1,
+    slop: 0,
     collisionFilter: {
-      category: 1
+      category: 1,
     },
     render: {
-      strokeStyle: "#ffffff"
-    }
+      strokeStyle: "#ffffff",
+    },
   });
+  let ctx = render.canvas.getContext("2d");
+  var my_gradient = ctx.createLinearGradient(0, 0, 0, 400);
+  my_gradient.addColorStop(0, "black");
+  my_gradient.addColorStop(1, "white");
   let arenaTop = Bodies.rectangle(width / 2, 100, width - 200, 30, {
     friction: 0,
     frictionStatic: 0,
     frictionAir: 0,
     isStatic: true,
     restitution: 1,
+    slop: 0,
     collisionFilter: {
-      category: 1
+      category: 1,
     },
     render: {
-      strokeStyle: "#ffffff"
-    }
+      fillStyle: my_gradient,
+      strokeStyle: "#ffffff",
+    },
   });
   let arenaBottom = Bodies.rectangle(width / 2, height - 100, width - 200, 30, {
     friction: 0,
@@ -128,12 +146,13 @@ Example.ballPool = async function({ element, width, height }) {
     frictionAir: 0,
     isStatic: true,
     restitution: 1,
+    slop: 0,
     collisionFilter: {
-      category: 1
+      category: 1,
     },
     render: {
-      strokeStyle: "#ffffff"
-    }
+      strokeStyle: "#ffffff",
+    },
   });
   arenaLeft.friction = 0;
   arenaLeft.frictionStatic = 0;
@@ -151,18 +170,18 @@ Example.ballPool = async function({ element, width, height }) {
     render,
     world,
     canvas: render.canvas,
-    stop: function() {
+    stop: function () {
       Matter.Render.stop(render);
       Matter.Runner.stop(runner);
-    }
+    },
   };
 };
 
 let keyState = {};
-const handleUp = function(evt) {
+const handleUp = function (evt) {
   keyState[evt.keyCode || evt.which] = false;
 };
-const handleDown = function(evt) {
+const handleDown = function (evt) {
   keyState[evt.keyCode || evt.which] = true;
 };
 
@@ -182,10 +201,24 @@ let bodyAngle = 0,
 export default {
   data() {
     return {
-      game: null
+      channel: null,
+      game: null,
     };
   },
   async mounted() {
+    this.channel = geckos({ port: 9208 }); // default port is 9208
+
+    this.channel.onConnect((error) => {
+      if (error) {
+        console.error(error.message);
+        return;
+      }
+
+      this.channel.onRaw((data) => {
+        console.log(data);
+      });
+    });
+
     let continuum = this.$refs.continuum;
     let width = window.innerWidth - 100;
     let height = window.innerHeight - 100;
@@ -202,9 +235,9 @@ export default {
     // 'init' parses all available CSS and attach ResizeSensor to those elements which
     // have rules attached (make sure this is called after 'load' event, because
     // CSS files are not ready when domReady is fired.
-    let requestAnimationFrame = ElementQueries.init();
-    new ResizeSensor(this.$refs.el, function(evt) {
-      console.log("Changed to " + evt.width);
+    console.log(this.$refs.screen);
+    new ResizeSensor(this.$refs.screen, function (evt) {
+      console.log("Changed to " + evt.width, evt.height);
     });
     let start;
 
@@ -215,25 +248,31 @@ export default {
           current: 1500,
           initial: 1500,
           recharge: 400,
-          afterburner: 550
+          afterburner: 550,
         },
         speed: {
           current: 0,
           initial: 200,
           max: 600,
-          rotation: 200
+          rotation: 200,
         },
         thrust: {
           initial: 16,
-          max: 24
+          max: 24,
         },
         maxSpeed: 6000,
         velocity: 200,
-        speed: 2000
-      }
+        speed: 2000,
+      },
     };
-
-    Matter.Events.on(game.runner, "beforeTick", evt => {
+    Matter.Events.on(game.engine, "collisionEnd", (evt) => {
+      let pairs = evt.pairs;
+      pairs.forEach((p) => {
+        console.log(p);
+      });
+      console.log(evt.source);
+    });
+    Matter.Events.on(game.runner, "beforeTick", (evt) => {
       // left
       if (keyState[37]) {
         this.rotate(-1);
@@ -303,15 +342,16 @@ export default {
           frictionStatic: 0,
           frictionAir: 0,
           restitution: 1,
+          slop: 0,
           collisionFilter: {
             category: 4,
             mask: 1,
-            group: -1
+            group: -1,
           },
           render: {
             strokeStyle: "#ffffff",
-            fillStyle: "#ffffff"
-          }
+            fillStyle: "#ffffff",
+          },
         }
       );
       Matter.Body.setVelocity(
@@ -320,6 +360,10 @@ export default {
       );
       bulletVelocityX = bullet.velocity.x;
       bulletVelocityY = bullet.velocity.y;
+      let x = new Int8Array(2);
+      x[0] = 0;
+      x[1] = 1;
+      this.channel.raw.emit(x);
       Matter.World.add(game.world, bullet);
     },
     rotate(direction) {
@@ -365,8 +409,8 @@ export default {
       //   if (body.acceleration.y > 3 || body.velocity.y < -3) {
       //     body.position.y -= amount;
       //   }
-    }
+    },
   },
-  beforeDestroy() {}
+  beforeDestroy() {},
 };
 </script>
