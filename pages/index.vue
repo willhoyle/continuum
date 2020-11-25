@@ -206,7 +206,7 @@ export default {
     };
   },
   async mounted() {
-    this.channel = geckos({ port: 9208 }); // default port is 9208
+    this.channel = geckos({ host: "http://165.22.1.235", port: 9208 }); // default port is 9208
 
     this.channel.onConnect((error) => {
       if (error) {

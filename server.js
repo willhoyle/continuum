@@ -1,8 +1,12 @@
-import geckos from '@geckos.io/server'
-
+const geckos = require('@geckos.io/server').default
+const http = require('http')
+const server = http.createServer({})
 const io = geckos()
 
-io.listen(9208) // default port is 9208
+io.addServer(server)
+// make sure the client uses the same port
+// @geckos.io/client uses the port 9208 by default
+server.listen(9208, "0.0.0.0")
 
 const connections = []
 
