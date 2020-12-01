@@ -1,22 +1,55 @@
 <template lang="pug">
 div
+  div(ref="continuum-container", style="position: fixed; left: 0px; top: 0px")
+    .continuum(ref="continuum")
+  div(style="position: fixed; left: 0px; top: 0px; width: 100%")
+    .has-text-centered.is-unselectable
+      span.is-size-2.has-text-white continuum
+      span.mr-1
+      span.is-size-4.has-text-grey 2020
   div(
-    ref="screen",
-    style="position: fixed; top: 0px; left: 0px; height: 100%; width: 100%;"
+    v-if="showEnterUsername",
+    style="position: fixed; left: 0%; top: 100px; width: 100%"
   )
-  div(
-    ref="el",
-    style="position: relative; height: 100%; width: 100%; top: 0; left: 0;"
-  )
-  .container-fluid
-    .columns
-      .column.mt-5.ml-5
-        | Continuum
-    .columns
-      .columns
-    .columns.ml-5
-      .column.continuum-container
-        .continuum(ref="continuum")
+    .columns.is-centered
+      .column.is-narrow
+        .card
+          .card-content(v-if="disconnectedFromServer")
+            b-icon(icon="information", type="is-danger", size="is-small")
+            span.ml-2 Lost connection to server
+          .card-content
+            b-field(label="Enter a username to play", grouped)
+              b-input(placeholder="username", type="text", v-model="username")
+              p.control
+                b-button.button.is-primary(@click="play") Play
+          .card-content(v-if="settingUpGame")
+            div(v-if="duplicateUsername")
+              b-icon(icon="account", type="is-danger", size="is-small")
+              span.ml-2 Username is already taken
+            div(v-if="connecting")
+              b-icon(icon="loading mdi-spin", size="is-small")
+              span.ml-2 Connecting to game server...
+            div(v-else-if="connectionError")
+              b-icon(icon="close", type="is-danger", size="is-small")
+              span.ml-2 Error connecting to game server (WebRTC)
+            //-   div
+            //-     b-icon(icon="close", type="is-danger", size="is-small")
+            //-     span.ml-2 {{ connectionError }}
+            div(v-else)
+              b-icon(icon="check", type="is-success", size="is-small")
+              span.ml-2 Connected to game server (WebRTC)
+
+  div(style="position: fixed; right: 2px; top: 2px; color: grey")
+    b-button(
+      type="has-text-primary-light",
+      style="background-color: rgba(255, 255, 255, 10%)",
+      @click="toggleFullscreen"
+    ) Full Screen
+    //-   .chat(
+    //-     v-if="showChat",
+    //-     style="position: absolute; left: 0px; bottom: 0px; color: grey"
+    //-   )
+    //-     div Chat
 </template>
 
 <script>
@@ -71,14 +104,18 @@ Example.ballPool = async function ({ element, width, height }) {
   var runner = Runner.create();
   Runner.run(runner, engine);
 
+  let arenaWidth = 1000;
+  let arenaHeight = 1000;
+  let arenaBorderThickness = 32;
+
   // add bodies
   let texture = "/warbird.png";
-  let body = Bodies.rectangle(width / 2, height / 2, 30, 30, {
+  let body = Matter.Bodies.circle(arenaWidth / 2, arenaHeight / 2, 14, {
     //   let body = Bodies.circle(width / 2, height / 2, 30, {
     friction: 0,
     frictionStatic: 0,
     frictionAir: 0,
-    restitution: 1,
+    restitution: 0.8,
     slop: 0,
     collisionFilter: {
       mask: 1,
@@ -91,69 +128,96 @@ Example.ballPool = async function ({ element, width, height }) {
       },
     },
   });
-  let arenaLeft = Bodies.rectangle(100, height / 2, 30, height - 200, {
-    friction: 0,
-    frictionStatic: 0,
-    frictionAir: 0,
-    isStatic: true,
-    restitution: 1,
-    slop: 0,
-    collisionFilter: {
-      category: 1,
-    },
-    render: {
-      strokeStyle: "#ffffff",
-    },
-  });
+  let arenaLeft = Bodies.rectangle(
+    arenaBorderThickness / 2,
+    height / 2,
+    arenaBorderThickness,
+    arenaHeight,
+    {
+      friction: 0,
+      frictionStatic: 0,
+      frictionAir: 0,
+      isStatic: true,
+      restitution: 1,
+      slop: 0,
+      collisionFilter: {
+        category: 1,
+      },
+      render: {
+        fillStyle: "grey",
+        strokeStyle: "#ffffff",
+      },
+    }
+  );
 
   Matter.Resolver._restingThresh = 0.001;
-  let arenaRight = Bodies.rectangle(width - 100, height / 2, 30, height - 200, {
-    friction: 0,
-    frictionStatic: 0,
-    frictionAir: 0,
-    isStatic: true,
-    restitution: 1,
-    slop: 0,
-    collisionFilter: {
-      category: 1,
-    },
-    render: {
-      strokeStyle: "#ffffff",
-    },
-  });
+  let arenaRight = Bodies.rectangle(
+    arenaWidth - arenaBorderThickness / 2,
+    height / 2,
+    arenaBorderThickness,
+    arenaHeight,
+    {
+      friction: 0,
+      frictionStatic: 0,
+      frictionAir: 0,
+      isStatic: true,
+      restitution: 1,
+      slop: 0,
+      collisionFilter: {
+        category: 1,
+      },
+      render: {
+        fillStyle: "grey",
+        strokeStyle: "#ffffff",
+      },
+    }
+  );
   let ctx = render.canvas.getContext("2d");
   var my_gradient = ctx.createLinearGradient(0, 0, 0, 400);
   my_gradient.addColorStop(0, "black");
   my_gradient.addColorStop(1, "white");
-  let arenaTop = Bodies.rectangle(width / 2, 100, width - 200, 30, {
-    friction: 0,
-    frictionStatic: 0,
-    frictionAir: 0,
-    isStatic: true,
-    restitution: 1,
-    slop: 0,
-    collisionFilter: {
-      category: 1,
-    },
-    render: {
-      fillStyle: my_gradient,
-      strokeStyle: "#ffffff",
-    },
-  });
-  let arenaBottom = Bodies.rectangle(width / 2, height - 100, width - 200, 30, {
-    friction: 0,
-    frictionStatic: 0,
-    frictionAir: 0,
-    isStatic: true,
-    restitution: 1,
-    slop: 0,
-    collisionFilter: {
-      category: 1,
-    },
-    render: {
-      strokeStyle: "#ffffff",
-    },
-  });
+  let arenaTop = Bodies.rectangle(
+    arenaWidth / 2,
+    height / 2 - arenaHeight / 2 - arenaBorderThickness / 2,
+    arenaWidth,
+    arenaBorderThickness,
+    {
+      friction: 0,
+      frictionStatic: 0,
+      frictionAir: 0,
+      isStatic: true,
+      restitution: 1,
+      slop: 0,
+      collisionFilter: {
+        category: 1,
+      },
+      render: {
+        fillStyle: "grey",
+        strokeStyle: "#ffffff",
+      },
+    }
+  );
+  let arenaBottom = Bodies.rectangle(
+    arenaWidth / 2,
+    height / 2 + arenaHeight / 2 + arenaBorderThickness / 2,
+    arenaWidth,
+    arenaBorderThickness,
+    {
+      friction: 0,
+      frictionStatic: 0,
+      frictionAir: 0,
+      isStatic: true,
+      restitution: 1,
+      slop: 0,
+      collisionFilter: {
+        category: 1,
+      },
+      render: {
+        fillStyle: "grey",
+        strokeStyle: "#ffffff",
+      },
+    }
+  );
   arenaLeft.friction = 0;
   arenaLeft.frictionStatic = 0;
   arenaLeft.frictionAir = 0;
@@ -185,7 +249,8 @@ const handleDown = function (evt) {
   keyState[evt.keyCode || evt.which] = true;
 };
 
-let game;
+let game, channel;
+let players = {};
 let bodyAngle = 0,
   bodyAngleDeg = 0,
   speed = 0,
@@ -201,28 +266,31 @@ let bodyAngle = 0,
 export default {
   data() {
     return {
+      duplicateUsername: false,
+      disconnectedFromServer: false,
+      settingUpGame: false,
+      connecting: false,
+      connectionError: false,
+      showEnterUsername: true,
+      showChat: true,
+      username: "",
+      storage: null,
       channel: null,
       game: null,
     };
   },
+  async beforeMount() {
+    let localStorage = window.localStorage;
+    if (localStorage.getItem("username")) {
+      this.username = localStorage.getItem("username");
+    }
+  },
   async mounted() {
-    this.channel = geckos({ host: "http://165.22.1.235", port: 9208 }); // default port is 9208
-
-    this.channel.onConnect((error) => {
-      if (error) {
-        console.error(error.message);
-        return;
-      }
-
-      this.channel.onRaw((data) => {
-        console.log(data);
-      });
-    });
-
     let continuum = this.$refs.continuum;
-    let width = window.innerWidth - 100;
-    let height = window.innerHeight - 100;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
     game = await Example.ballPool({ element: continuum, height, width });
+
     window.addEventListener("keyup", handleUp, true);
     window.addEventListener("keydown", handleDown, true);
 
@@ -235,9 +303,8 @@ export default {
     // 'init' parses all available CSS and attach ResizeSensor to those elements which
     // have rules attached (make sure this is called after 'load' event, because
     // CSS files are not ready when domReady is fired.
-    console.log(this.$refs.screen);
-    new ResizeSensor(this.$refs.screen, function (evt) {
-      console.log("Changed to " + evt.width, evt.height);
+    new ResizeSensor(this.$refs["continuum-container"], (evt) => {
+      this.resize(evt);
     });
     let start;
 
@@ -265,12 +332,46 @@ export default {
         speed: 2000,
       },
     };
+    let lastCalledTime, fps;
+    Matter.Events.on(game.render, "beforeRender", (evt) => {
+      if (!lastCalledTime) {
+        lastCalledTime = evt.timestamp;
+        fps = 0;
+        return;
+      }
+      let delta = (evt.timestamp - lastCalledTime) / 1000;
+      lastCalledTime = evt.timestamp;
+      fps = 1 / delta;
+    });
+
     Matter.Events.on(game.engine, "collisionEnd", (evt) => {
       let pairs = evt.pairs;
       pairs.forEach((p) => {
-        console.log(p);
+        if (
+          p.bodyA.collisionFilter.category == 4 ||
+          p.bodyB.collisionFilter.category == 4
+        ) {
+          let bullet =
+            p.bodyA.collisionFilter.category == 4 ? p.bodyA : p.bodyB;
+          Matter.World.remove(game.world, bullet);
+        }
       });
-      console.log(evt.source);
+    });
+    Matter.Events.on(game.runner, "afterTick", (evt) => {
+      let body = Matter.Composite.allBodies(game.world)[0];
+      Matter.Render.lookAt(
+        game.render,
+        body,
+        { x: width / 2, y: height / 2 },
+        true
+      );
+      if (channel) {
+        let x = new Int16Array(3);
+        x[0] = body.position.x;
+        x[1] = body.position.y;
+        x[2] = body.angle;
+        channel.raw.emit(x);
+      }
     });
     Matter.Events.on(game.runner, "beforeTick", (evt) => {
       // left
@@ -319,10 +420,148 @@ export default {
         100
       );
       ctx.fillText(`force:  x: ${forceX}  y: ${forceY}`, 5, 120);
+      ctx.fillText(`${Math.round(fps)} fps`, 5, 140);
+      ctx.font = "16px Arial";
+      ctx.fillStyle = "#fdde3f";
+      ctx.fillText(`${this.username}`, width / 2 + 8, height / 2 + 30);
     });
     //   console.log(delta);
   },
   methods: {
+    createChannel() {
+      if (!channel) {
+        this.connecting = true;
+        channel = geckos({
+          host: process.env.geckosHost,
+          port: process.env.geckosPort,
+        }); // default port is 9208
+
+        channel.onConnect((error) => {
+          if (error) {
+            this.connecting = false;
+            this.connectionError = error.message;
+            channel = null;
+            console.error(error.message);
+            return;
+          }
+          this.connecting = false;
+          this.connectionError = false;
+          this.lostConnectionToServer = false;
+          this.duplicateUsername = false;
+
+          channel.onRaw((data) => {
+            let bodies = Matter.Composite.allBodies(game.world);
+            data = new Int16Array(data);
+            let id = data[0];
+            let player = players[id];
+            let idx = player.idx;
+            Matter.Body.setPosition(bodies[idx], { x: data[1], y: data[2] });
+            Matter.Body.setAngle(bodies[idx], data[3]);
+            let ctx = game.canvas.getContext("2d");
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "blue";
+            ctx.fillText(`${this.username}`, data[1] + 8, data[2] + 30);
+          });
+          channel.emit(
+            "play",
+            {
+              username: this.username,
+            },
+            { reliable: true, runs: 5, interval: 200 }
+          );
+          // listens for a custom event from the server
+          channel.on("play", (data) => {
+            console.log(data);
+            if (data.id == null) {
+              this.duplicateUsername = true;
+            } else {
+              data.players.forEach((player) => {
+                if (player.id == data.id) return;
+                let body = Matter.Bodies.circle(500, 500, 14, {
+                  //   let body = Bodies.circle(width / 2, height / 2, 30, {
+                  friction: 0,
+                  frictionStatic: 0,
+                  frictionAir: 0,
+                  restitution: 0.8,
+                  slop: 0,
+                  collisionFilter: {
+                    mask: 5,
+                    category: 8,
+                  },
+                  render: {
+                    strokeStyle: "#ffffff",
+                    sprite: {
+                      texture: "/warbird.png",
+                    },
+                  },
+                });
+                Matter.World.add(game.world, body);
+                players[player.id] = {
+                  idx: Matter.Composite.allBodies(game.world).length - 1,
+                  username: player.username,
+                };
+              });
+              this.settingUpGame = false;
+              this.showEnterUsername = false;
+              this.duplicateUsername = false;
+            }
+          });
+          channel.on("newPlayer", (data) => {
+            if (data.username !== this.username) {
+              let body = Matter.Bodies.circle(500, 500, 14, {
+                //   let body = Bodies.circle(width / 2, height / 2, 30, {
+                friction: 0,
+                frictionStatic: 0,
+                frictionAir: 0,
+                restitution: 0.8,
+                slop: 0,
+                collisionFilter: {
+                  mask: 5,
+                  category: 8,
+                },
+                render: {
+                  strokeStyle: "#ffffff",
+                  sprite: {
+                    texture: "/warbird.png",
+                  },
+                },
+              });
+              Matter.World.add(game.world, body);
+              players[data.id] = {
+                idx: Matter.Composite.allBodies(game.world).length - 1,
+                username: data.username,
+              };
+            }
+          });
+          channel.onDisconnect(() => {
+            this.disconnectedFromServer = true;
+            this.showEnterUsername = true;
+            channel = null;
+          });
+        });
+      } else {
+        channel.emit(
+          "play",
+          {
+            username: this.username,
+          },
+          { reliable: true, runs: 5, interval: 200 }
+        );
+      }
+    },
+    play(evt) {
+      if (this.username.length >= 2 && this.username.length <= 30) {
+        window.localStorage.setItem("username", this.username);
+        this.settingUpGame = true;
+        this.createChannel();
+      }
+    },
+    toggleFullscreen() {
+      this.$refs["continuum-container"].requestFullscreen();
+    },
+    resize(evt) {
+      console.log(evt);
+    },
     shoot(game) {
       lastShot = performance.now();
       let body = Matter.Composite.allBodies(game.world)[0];
@@ -338,6 +577,7 @@ export default {
         5,
         5,
         {
+          label: "bullet",
           friction: 0,
           frictionStatic: 0,
           frictionAir: 0,
@@ -345,7 +585,7 @@ export default {
           slop: 0,
           collisionFilter: {
             category: 4,
-            mask: 1,
+            mask: 9,
             group: -1,
           },
           render: {
@@ -363,7 +603,7 @@ export default {
       let x = new Int8Array(2);
       x[0] = 0;
       x[1] = 1;
-      this.channel.raw.emit(x);
+      channel.raw.emit(x);
       Matter.World.add(game.world, bullet);
     },
     rotate(direction) {
@@ -414,3 +654,12 @@ export default {
   beforeDestroy() {},
 };
 </script>
+
+<style>
+html,
+body {
+  overflow: hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+</style>

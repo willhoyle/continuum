@@ -36,9 +36,14 @@ export default {
   // Build Configuration (https://go.nuxtjs.dev/config-build)
   build: {},
 
+  env: {
+    geckosHost: process.env.GECKOS_HOST || 'http://localhost',
+    geckosPort: process.env.GECKOS_PORT || 9208
+  },
+
   server: {
-    port: 80, // default: 3000
-    host: '0.0.0.0', // default: localhost,
+    port: process.env.PORT || 80, // default: 3000
+    host: process.env.HOST || '0.0.0.0', // default: localhost,
     timing: false
   }
 };
