@@ -277,6 +277,8 @@ export default {
       storage: null,
       channel: null,
       game: null,
+      width: 0,
+      height: 0,
     };
   },
   async beforeMount() {
@@ -288,7 +290,9 @@ export default {
   async mounted() {
     let continuum = this.$refs.continuum;
     let width = window.innerWidth;
+    this.width = window.innerWidth;
     let height = window.innerHeight;
+    this.height = window.innerHeight;
     game = await Example.ballPool({ element: continuum, height, width });
 
     window.addEventListener("keyup", handleUp, true);
@@ -359,18 +363,25 @@ export default {
     });
     Matter.Events.on(game.runner, "afterTick", (evt) => {
       let body = Matter.Composite.allBodies(game.world)[0];
+
       Matter.Render.lookAt(
         game.render,
         body,
-        { x: width / 2, y: height / 2 },
+        { x: this.width / 2, y: this.height / 2 },
         true
       );
       if (channel) {
-        let x = new Int16Array(3);
-        x[0] = body.position.x;
-        x[1] = body.position.y;
-        x[2] = body.angle;
-        channel.raw.emit(x);
+        let buffer = new ArrayBuffer(3 * 4);
+        let view = new DataView(buffer);
+        view.setUint32(0, body.position.x);
+        view.setUint32(1 * 4, body.position.y);
+        view.setFloat32(2 * 4, body.angle);
+        // console.log(
+        //   `x: ${view.getUint32(0 * 4)}, y: ${view.getUint32(
+        //     1 * 4
+        //   )}, angle: ${view.getFloat32(2 * 4)}`
+        // );
+        channel.raw.emit(view.buffer);
       }
     });
     Matter.Events.on(game.runner, "beforeTick", (evt) => {
@@ -403,27 +414,46 @@ export default {
       } else {
         // this.coast();
       }
-      let body = Matter.Composite.allBodies(game.world)[0];
-      speed = body.speed;
-      velocityX = body.velocity.x;
-      velocityY = body.velocity.y;
+      let bodies = Matter.Composite.allBodies(game.world);
+      let body = bodies[0];
       let ctx = game.canvas.getContext("2d");
-      ctx.font = "16px Arial";
-      ctx.fillStyle = "white";
-      ctx.fillText(`radians: ${bodyAngle}`, 5, 20);
-      ctx.fillText(`degrees: ${bodyAngleDeg}`, 5, 40);
-      ctx.fillText(`speed: ${speed}`, 5, 60);
-      ctx.fillText(`velocity:  x: ${velocityX}  y: ${velocityY}`, 5, 80);
-      ctx.fillText(
-        `bullet velocity:  x: ${bulletVelocityX}  y: ${bulletVelocityY}`,
-        5,
-        100
-      );
-      ctx.fillText(`force:  x: ${forceX}  y: ${forceY}`, 5, 120);
-      ctx.fillText(`${Math.round(fps)} fps`, 5, 140);
+      //   speed = body.speed;
+      //   velocityX = body.velocity.x;
+      //   velocityY = body.velocity.y;
+      //   ctx.font = "16px Arial";
+      //   ctx.fillStyle = "white";
+      //   ctx.fillText(`radians: ${bodyAngle}`, 5, 20);
+      //   ctx.fillText(`degrees: ${bodyAngleDeg}`, 5, 40);
+      //   ctx.fillText(`speed: ${speed}`, 5, 60);
+      //   ctx.fillText(`velocity:  x: ${velocityX}  y: ${velocityY}`, 5, 80);
+      //   ctx.fillText(
+      //     `bullet velocity:  x: ${bulletVelocityX}  y: ${bulletVelocityY}`,
+      //     5,
+      //     100
+      //   );
+      //   ctx.fillText(`force:  x: ${forceX}  y: ${forceY}`, 5, 120);
+      //   ctx.fillText(`${Math.round(fps)} fps`, 5, 140);
+
+      Object.keys(players)
+        .map((k) => players[k])
+        .map((player) => {
+          ctx.font = "16px Arial";
+          ctx.fillStyle = "#7f51fc";
+          let username = player.username;
+          let ship = bodies[player.idx];
+          let { x, y } = ship.position;
+          x = x - body.position.x;
+          y = y - body.position.y;
+
+          ctx.fillText(username, x, y + 80);
+        });
       ctx.font = "16px Arial";
       ctx.fillStyle = "#fdde3f";
-      ctx.fillText(`${this.username}`, width / 2 + 8, height / 2 + 30);
+      ctx.fillText(
+        `${this.username}`,
+        this.width / 2 + 8,
+        this.height / 2 + 30
+      );
     });
     //   console.log(delta);
   },
@@ -451,16 +481,19 @@ export default {
 
           channel.onRaw((data) => {
             let bodies = Matter.Composite.allBodies(game.world);
-            data = new Int16Array(data);
-            let id = data[0];
+            let view = new DataView(data);
+            let id = view.getUint32(0);
             let player = players[id];
             let idx = player.idx;
-            Matter.Body.setPosition(bodies[idx], { x: data[1], y: data[2] });
-            Matter.Body.setAngle(bodies[idx], data[3]);
-            let ctx = game.canvas.getContext("2d");
-            ctx.font = "16px Arial";
-            ctx.fillStyle = "blue";
-            ctx.fillText(`${this.username}`, data[1] + 8, data[2] + 30);
+            Matter.Body.setPosition(bodies[idx], {
+              x: view.getUint32(1 * 4),
+              y: view.getUint32(2 * 4),
+            });
+            Matter.Body.setAngle(bodies[idx], view.getFloat32(3 * 4));
+            // let ctx = game.canvas.getContext("2d");
+            // ctx.font = "16px Arial";
+            // ctx.fillStyle = "blue";
+            // ctx.fillText(`${this.username}`, data[1] + 8, data[2] + 30);
           });
           channel.emit(
             "play",
@@ -471,7 +504,6 @@ export default {
           );
           // listens for a custom event from the server
           channel.on("play", (data) => {
-            console.log(data);
             if (data.id == null) {
               this.duplicateUsername = true;
             } else {
@@ -479,6 +511,7 @@ export default {
                 if (player.id == data.id) return;
                 let body = Matter.Bodies.circle(500, 500, 14, {
                   //   let body = Bodies.circle(width / 2, height / 2, 30, {
+                  label: "enemy",
                   friction: 0,
                   frictionStatic: 0,
                   frictionAir: 0,
@@ -499,6 +532,7 @@ export default {
                 players[player.id] = {
                   idx: Matter.Composite.allBodies(game.world).length - 1,
                   username: player.username,
+                  matterId: body.id,
                 };
               });
               this.settingUpGame = false;
@@ -560,7 +594,9 @@ export default {
       this.$refs["continuum-container"].requestFullscreen();
     },
     resize(evt) {
-      console.log(evt);
+      console.log(this.width, this.height);
+      this.width = game.canvas.width = evt.width;
+      this.height = game.canvas.height = evt.height;
     },
     shoot(game) {
       lastShot = performance.now();
@@ -571,39 +607,33 @@ export default {
       //   bullet shoots in direction the ship is pointing
       let bulletVector = Matter.Vector.rotate({ x: 0, y: 10 }, bodyAngle);
       //   console.log(bulletVector);
-      let bullet = Matter.Bodies.rectangle(
-        body.position.x,
-        body.position.y,
-        5,
-        5,
-        {
-          label: "bullet",
-          friction: 0,
-          frictionStatic: 0,
-          frictionAir: 0,
-          restitution: 1,
-          slop: 0,
-          collisionFilter: {
-            category: 4,
-            mask: 9,
-            group: -1,
-          },
-          render: {
-            strokeStyle: "#ffffff",
-            fillStyle: "#ffffff",
-          },
-        }
-      );
+      let bullet = Matter.Bodies.circle(body.position.x, body.position.y, 3, {
+        label: "bullet",
+        friction: 0,
+        frictionStatic: 0,
+        frictionAir: 0,
+        restitution: 1,
+        slop: 0,
+        collisionFilter: {
+          category: 4,
+          mask: 9,
+          group: -1,
+        },
+        render: {
+          strokeStyle: "#ffffff",
+          fillStyle: "#ffffff",
+        },
+      });
       Matter.Body.setVelocity(
         bullet,
         Matter.Vector.sub(body.velocity, bulletVector)
       );
       bulletVelocityX = bullet.velocity.x;
       bulletVelocityY = bullet.velocity.y;
-      let x = new Int8Array(2);
-      x[0] = 0;
-      x[1] = 1;
-      channel.raw.emit(x);
+      //   let x = new Int8Array(2);
+      //   x[0] = 0;
+      //   x[1] = 1;
+      //   channel.raw.emit(x);
       Matter.World.add(game.world, bullet);
     },
     rotate(direction) {
