@@ -10,8 +10,8 @@
         "generate": "nuxt generate"
     },
     "dependencies": {
-        "@geckos.io/client": "^1.7.0",
-        "@geckos.io/server": "^1.7.0",
+        "@geckos.io/client": "^1.7.2",
+        "@geckos.io/server": "^1.7.2",
         "@nuxtjs/axios": "^5.12.2",
         "core-js": "^3.6.5",
         "css-element-queries": "^1.2.3",
@@ -20,12 +20,12 @@
         "matter-js": "^0.14.2",
         "matter-wrap": "^0.2.0",
         "nipplejs": "^0.8.7",
-        "nuxt": "^2.14.6",
-        "nuxt-buefy": "^0.4.3",
-        "pug": "^3.0.0",
-        "pug-plain-loader": "^1.0.0"
+        "nuxt": "^2.15.4",
+        "nuxt-buefy": "^0.4.6",
+        "pug": "^3.0.2",
+        "pug-plain-loader": "^1.1.0"
     },
     "devDependencies": {
-        "nodemon": "^2.0.6"
+        "nodemon": "^2.0.7"
     }
 }
