@@ -594,7 +594,6 @@ export default {
       this.$refs["continuum-container"].requestFullscreen();
     },
     resize(evt) {
-      console.log(this.width, this.height);
       this.width = game.canvas.width = evt.width;
       this.height = game.canvas.height = evt.height;
     },
